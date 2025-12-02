@@ -7,11 +7,19 @@ interface StudentListProps {
   students: Student[];
   records: AttendanceRecord[];
   attendanceThreshold: number;
+  currentSchoolId?: string;
   onUpdate: () => void;
   onSelectStudent: (student: Student) => void;
 }
 
-const StudentList: React.FC<StudentListProps> = ({ students, records, attendanceThreshold, onUpdate, onSelectStudent }) => {
+const StudentList: React.FC<StudentListProps> = ({ 
+  students, 
+  records, 
+  attendanceThreshold, 
+  currentSchoolId,
+  onUpdate, 
+  onSelectStudent 
+}) => {
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentGrade, setNewStudentGrade] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,18 +55,28 @@ const StudentList: React.FC<StudentListProps> = ({ students, records, attendance
     if (!newStudentName.trim() || !newStudentGrade.trim()) return;
 
     if (editingStudentId) {
-      updateStudent({
-        id: editingStudentId,
-        name: newStudentName,
-        grade: newStudentGrade,
-      });
+      const originalStudent = students.find(s => s.id === editingStudentId);
+      if (originalStudent) {
+        updateStudent({
+          id: editingStudentId,
+          name: newStudentName,
+          grade: newStudentGrade,
+          schoolId: originalStudent.schoolId,
+        });
+      }
     } else {
-      const newStudent: Student = {
-        id: crypto.randomUUID(),
-        name: newStudentName,
-        grade: newStudentGrade,
-      };
-      saveStudent(newStudent);
+      if (currentSchoolId) {
+        const newStudent: Student = {
+          id: crypto.randomUUID(),
+          name: newStudentName,
+          grade: newStudentGrade,
+          schoolId: currentSchoolId,
+        };
+        saveStudent(newStudent);
+      } else {
+        alert("خطأ: لم يتم تحديد المدرسة");
+        return;
+      }
     }
 
     setNewStudentName('');
@@ -70,6 +88,10 @@ const StudentList: React.FC<StudentListProps> = ({ students, records, attendance
 
   const handleBulkImport = () => {
     if (!importText.trim()) return;
+    if (!currentSchoolId) {
+       alert("خطأ: لم يتم تحديد المدرسة");
+       return;
+    }
 
     const lines = importText.split('\n');
     const newStudents: Student[] = [];
@@ -84,7 +106,8 @@ const StudentList: React.FC<StudentListProps> = ({ students, records, attendance
           newStudents.push({
             id: crypto.randomUUID(),
             name,
-            grade
+            grade,
+            schoolId: currentSchoolId
           });
         }
       }

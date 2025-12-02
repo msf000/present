@@ -70,6 +70,7 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
     const recordsToSave: AttendanceRecord[] = students.map(s => ({
       id: `${selectedDate}-${s.id}`,
       studentId: s.id,
+      schoolId: s.schoolId,
       date: selectedDate,
       status: records[s.id] || AttendanceStatus.PRESENT,
       note: notes[s.id] || ''
