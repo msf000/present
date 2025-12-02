@@ -115,8 +115,11 @@ const StudentList: React.FC<StudentListProps> = ({ students, records, attendance
     
     const present = studentRecords.filter(r => r.status === AttendanceStatus.PRESENT).length;
     const late = studentRecords.filter(r => r.status === AttendanceStatus.LATE).length;
-    const score = present + (late * 0.5);
-    const rate = Math.round((score / studentRecords.length) * 100);
+    const excused = studentRecords.filter(r => r.status === AttendanceStatus.EXCUSED).length;
+    const total = studentRecords.length;
+
+    // Rate calculation consistent with dashboard: Excused is not a penalty.
+    const rate = Math.round(((present + excused + (late * 0.5)) / total) * 100);
     return { rate, label: `${rate}%` };
   };
 

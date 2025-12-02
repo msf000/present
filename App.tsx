@@ -146,7 +146,7 @@ function App() {
 
         <div className="p-4 border-t border-slate-700">
            <button 
-             onClick={() => { generateMockData(); setIsSidebarOpen(false); }}
+             onClick={() => { generateMockData(); setIsSidebarOpen(false); window.location.reload(); }}
              className="w-full flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-slate-300 py-2 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
            >
              <Database size={14} />
@@ -174,7 +174,14 @@ function App() {
           </div>
         </header>
 
-        {currentView === 'dashboard' && <Dashboard students={students} records={records} settings={settings} />}
+        {currentView === 'dashboard' && (
+          <Dashboard 
+            students={students} 
+            records={records} 
+            settings={settings} 
+            onNavigate={handleNavClick}
+          />
+        )}
         
         {currentView === 'students' && (
           <StudentList 

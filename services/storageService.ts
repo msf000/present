@@ -32,16 +32,26 @@ export const generateMockData = () => {
     students.forEach(student => {
       const rand = Math.random();
       let status = AttendanceStatus.PRESENT;
+      let note = '';
+
       // Make some students have bad attendance for testing
       if (student.id === '3' && rand > 0.4) status = AttendanceStatus.ABSENT;
-      else if (rand > 0.85) status = AttendanceStatus.ABSENT;
-      else if (rand > 0.75) status = AttendanceStatus.LATE;
+      else if (rand > 0.90) status = AttendanceStatus.ABSENT;
+      else if (rand > 0.85) {
+        status = AttendanceStatus.EXCUSED;
+        note = Math.random() > 0.5 ? 'عذر طبي' : 'ظرف عائلي';
+      }
+      else if (rand > 0.75) {
+        status = AttendanceStatus.LATE;
+        if (Math.random() > 0.7) note = 'تأخير صباحي';
+      }
 
       records.push({
         id: `${dateStr}-${student.id}`,
         studentId: student.id,
         date: dateStr,
         status,
+        note
       });
     });
   }
@@ -102,7 +112,7 @@ export const getRecordsByDate = (date: string): AttendanceRecord[] => {
 
 export const exportToCSV = (students: Student[], records: AttendanceRecord[]) => {
   // Create CSV header
-  const headers = ['اسم الطالب', 'الصف', 'التاريخ', 'الحالة'];
+  const headers = ['اسم الطالب', 'الصف', 'التاريخ', 'الحالة', 'ملاحظات'];
   
   // Create CSV rows
   const rows = records.map(record => {
@@ -112,13 +122,18 @@ export const exportToCSV = (students: Student[], records: AttendanceRecord[]) =>
       case AttendanceStatus.PRESENT: statusAr = 'حاضر'; break;
       case AttendanceStatus.ABSENT: statusAr = 'غائب'; break;
       case AttendanceStatus.LATE: statusAr = 'متأخر'; break;
+      case AttendanceStatus.EXCUSED: statusAr = 'بعذر'; break;
     }
+    
+    // Clean note from commas to avoid breaking CSV
+    const safeNote = record.note ? record.note.replace(/,/g, ' ') : '';
     
     return [
       student ? student.name : 'طالب محذوف',
       student ? student.grade : '-',
       record.date,
-      statusAr
+      statusAr,
+      safeNote
     ].join(',');
   });
 

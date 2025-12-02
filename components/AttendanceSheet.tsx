@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Save, Check, Search, Filter, CheckSquare, XCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { Calendar, Save, Check, Search, Filter, CheckSquare, XCircle, Clock, CheckCircle2, FileText, MessageSquare, ChevronRight, ChevronLeft, RotateCcw } from 'lucide-react';
 import { Student, AttendanceRecord, AttendanceStatus } from '../types';
 import { saveAttendance, getRecordsByDate } from '../services/storageService';
 
@@ -11,9 +11,11 @@ interface AttendanceSheetProps {
 const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate }) => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 
   const uniqueGrades = useMemo(() => {
     const grades = new Set(students.map(s => s.grade));
@@ -24,20 +26,44 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
     // Load existing records for the selected date
     const existing = getRecordsByDate(selectedDate);
     const newRecordsState: Record<string, AttendanceStatus> = {};
+    const newNotesState: Record<string, string> = {};
     
     students.forEach(s => {
       const record = existing.find(r => r.studentId === s.id);
       // Default to Present if no record exists yet
       newRecordsState[s.id] = record ? record.status : AttendanceStatus.PRESENT;
+      newNotesState[s.id] = record?.note || '';
     });
 
     setRecords(newRecordsState);
+    setNotes(newNotesState);
     setSavedSuccess(false);
+    setActiveNoteId(null);
   }, [selectedDate, students]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
     setRecords(prev => ({ ...prev, [studentId]: status }));
     setSavedSuccess(false);
+    
+    // Automatically open note input if "Excused" is selected and no note exists
+    if (status === AttendanceStatus.EXCUSED && !notes[studentId]) {
+      setActiveNoteId(studentId);
+    }
+  };
+
+  const handleNoteChange = (studentId: string, value: string) => {
+    setNotes(prev => ({ ...prev, [studentId]: value }));
+    setSavedSuccess(false);
+  };
+
+  const changeDate = (days: number) => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() + days);
+    setSelectedDate(date.toISOString().split('T')[0]);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleSave = () => {
@@ -46,11 +72,13 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
       studentId: s.id,
       date: selectedDate,
       status: records[s.id] || AttendanceStatus.PRESENT,
+      note: notes[s.id] || ''
     }));
 
     saveAttendance(recordsToSave);
     onUpdate();
     setSavedSuccess(true);
+    setActiveNoteId(null);
     
     // Hide success message after 3 seconds
     setTimeout(() => setSavedSuccess(false), 3000);
@@ -74,17 +102,15 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
   };
 
   const currentStats = useMemo(() => {
-    let present = 0, absent = 0, late = 0;
-    // Calculate stats only for displayed students to avoid confusion, or all students? 
-    // Usually calculating for ALL students in the current context/grade is better.
-    // Let's go with all filtered students to match what the user is seeing/editing.
+    let present = 0, absent = 0, late = 0, excused = 0;
     filteredStudents.forEach(s => {
       const status = records[s.id];
       if (status === AttendanceStatus.ABSENT) absent++;
       else if (status === AttendanceStatus.LATE) late++;
+      else if (status === AttendanceStatus.EXCUSED) excused++;
       else present++; // Default is present
     });
-    return { present, absent, late, total: filteredStudents.length };
+    return { present, absent, late, excused, total: filteredStudents.length };
   }, [records, filteredStudents]);
 
   if (students.length === 0) {
@@ -95,21 +121,46 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
     );
   }
 
+  // Helper to show readable date
+  const readableDate = new Date(selectedDate).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <div className="space-y-6 pb-24 relative">
+    <div className="space-y-6 pb-24 relative animate-fade-in">
       <div className="flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-           {/* Date Picker */}
-           <div className="flex items-center gap-4 w-full lg:w-auto">
-            <label className="text-slate-700 font-medium whitespace-nowrap">تاريخ اليوم:</label>
-            <div className="relative w-full lg:w-auto">
-              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full lg:w-64 pl-4 pr-10 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
+           {/* Date Picker with Navigation */}
+           <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+             <div className="flex items-center gap-2 w-full sm:w-auto">
+               <button onClick={() => changeDate(-1)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-indigo-600 transition-colors">
+                 <ChevronRight size={20} />
+               </button>
+               
+               <div className="flex items-center gap-2 relative w-full sm:w-auto">
+                 <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                 <input
+                   type="date"
+                   value={selectedDate}
+                   onChange={(e) => setSelectedDate(e.target.value)}
+                   className="w-full sm:w-40 pl-4 pr-10 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer text-sm"
+                 />
+               </div>
+
+               <button onClick={() => changeDate(1)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-indigo-600 transition-colors">
+                 <ChevronLeft size={20} />
+               </button>
+            </div>
+            
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+               <span className="text-slate-600 font-medium min-w-[120px] text-center bg-slate-50 px-3 py-2 rounded-lg text-sm border border-slate-100">
+                 {readableDate}
+               </span>
+               <button 
+                 onClick={goToToday}
+                 className="flex items-center gap-1 text-xs text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors border border-indigo-100"
+               >
+                 <RotateCcw size={14} />
+                 <span>اليوم</span>
+               </button>
             </div>
           </div>
           
@@ -120,7 +171,7 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
               title="تحديد الكل كـ حاضر للطلاب المعروضين"
             >
               <CheckSquare size={20} />
-              <span>الكل حاضر</span>
+              <span className="text-sm">الكل حاضر</span>
             </button>
             <button
               onClick={handleSave}
@@ -171,18 +222,30 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
               <th className="p-4 text-slate-600 font-medium">اسم الطالب</th>
               <th className="p-4 text-slate-600 font-medium text-center">حاضر</th>
               <th className="p-4 text-slate-600 font-medium text-center">متأخر</th>
+              <th className="p-4 text-slate-600 font-medium text-center">بعذر</th>
               <th className="p-4 text-slate-600 font-medium text-center">غائب</th>
+              <th className="p-4 text-slate-600 font-medium text-center w-16"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredStudents.length > 0 ? (
               filteredStudents.map((student) => {
               const currentStatus = records[student.id];
+              const hasNote = notes[student.id] && notes[student.id].trim().length > 0;
+              const isNoteActive = activeNoteId === student.id;
+
               return (
-                <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                <React.Fragment key={student.id}>
+                <tr className="hover:bg-slate-50 transition-colors">
                   <td className="p-4 font-medium text-slate-800">
                     <div>{student.name}</div>
                     <div className="text-xs text-slate-500">{student.grade}</div>
+                    {hasNote && !isNoteActive && (
+                      <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                        <FileText size={10} />
+                        <span className="truncate max-w-[150px]">{notes[student.id]}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 text-center">
                     <label className="cursor-pointer inline-flex items-center justify-center p-2 rounded-full hover:bg-green-50">
@@ -207,6 +270,17 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
                     </label>
                   </td>
                   <td className="p-4 text-center">
+                    <label className="cursor-pointer inline-flex items-center justify-center p-2 rounded-full hover:bg-blue-50">
+                      <input
+                        type="radio"
+                        name={`status-${student.id}`}
+                        checked={currentStatus === AttendanceStatus.EXCUSED}
+                        onChange={() => handleStatusChange(student.id, AttendanceStatus.EXCUSED)}
+                        className="w-5 h-5 text-blue-500 focus:ring-blue-500 border-gray-300 accent-blue-500"
+                      />
+                    </label>
+                  </td>
+                  <td className="p-4 text-center">
                     <label className="cursor-pointer inline-flex items-center justify-center p-2 rounded-full hover:bg-red-50">
                       <input
                         type="radio"
@@ -217,12 +291,46 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
                       />
                     </label>
                   </td>
+                  <td className="p-4 text-center">
+                    <button
+                      onClick={() => setActiveNoteId(isNoteActive ? null : student.id)}
+                      className={`p-2 rounded-full transition-colors ${
+                        hasNote || isNoteActive ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                      }`}
+                      title="إضافة ملاحظة"
+                    >
+                      <MessageSquare size={18} fill={hasNote ? "currentColor" : "none"} />
+                    </button>
+                  </td>
                 </tr>
+                {isNoteActive && (
+                  <tr className="bg-indigo-50/30 animate-fade-in">
+                    <td colSpan={6} className="p-3 border-b border-indigo-100">
+                      <div className="flex items-center gap-2 max-w-lg mx-auto">
+                         <input
+                           type="text"
+                           value={notes[student.id] || ''}
+                           onChange={(e) => handleNoteChange(student.id, e.target.value)}
+                           placeholder="اكتب سبب العذر أو ملاحظة..."
+                           className="flex-1 p-2 border border-indigo-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                           autoFocus
+                         />
+                         <button 
+                           onClick={() => setActiveNoteId(null)}
+                           className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg"
+                         >
+                           <Check size={18} />
+                         </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               );
             })
             ) : (
                <tr>
-                 <td colSpan={4} className="p-8 text-center text-slate-400">لا توجد نتائج تطابق البحث</td>
+                 <td colSpan={6} className="p-8 text-center text-slate-400">لا توجد نتائج تطابق البحث</td>
                </tr>
             )}
           </tbody>
@@ -230,8 +338,8 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
       </div>
 
       {/* Real-time Stats Footer */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] p-4 flex justify-between items-center z-10 transition-transform animate-fade-in">
-        <div className="flex gap-4 md:gap-8 mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] p-4 z-10 transition-transform animate-fade-in overflow-x-auto print:hidden">
+        <div className="flex gap-6 mx-auto justify-center min-w-max">
            <div className="flex items-center gap-2 text-green-700 font-bold">
              <CheckCircle2 size={20} className="text-green-600" />
              <span className="hidden md:inline">حاضر:</span>
@@ -242,6 +350,12 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ students, onUpdate })
              <Clock size={20} className="text-amber-600" />
              <span className="hidden md:inline">متأخر:</span>
              <span className="text-xl">{currentStats.late}</span>
+           </div>
+
+           <div className="flex items-center gap-2 text-blue-700 font-bold">
+             <FileText size={20} className="text-blue-600" />
+             <span className="hidden md:inline">بعذر:</span>
+             <span className="text-xl">{currentStats.excused}</span>
            </div>
 
            <div className="flex items-center gap-2 text-red-700 font-bold">

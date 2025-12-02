@@ -3,6 +3,7 @@ export enum AttendanceStatus {
   PRESENT = 'present',
   ABSENT = 'absent',
   LATE = 'late',
+  EXCUSED = 'excused',
 }
 
 export interface Student {
@@ -16,6 +17,7 @@ export interface AttendanceRecord {
   studentId: string;
   date: string; // YYYY-MM-DD
   status: AttendanceStatus;
+  note?: string;
 }
 
 export interface DailyStat {
@@ -23,6 +25,7 @@ export interface DailyStat {
   present: number;
   absent: number;
   late: number;
+  excused: number;
 }
 
 export interface AppSettings {
