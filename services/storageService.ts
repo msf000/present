@@ -1,4 +1,4 @@
-import { Student, AttendanceRecord, AttendanceStatus, AppSettings, User, School } from '../types';
+import { Student, AttendanceRecord, AttendanceStatus, AppSettings, User, School, SystemLog } from '../types';
 
 const STORAGE_KEYS = {
   SCHOOLS: 'attendance_app_schools',
@@ -28,6 +28,14 @@ export const generateMockData = () => {
       principalId: 'u8', 
       subscriptionEndDate: '2023-01-01',
       studentCount: 2
+    },
+    { 
+      id: 's3', 
+      name: 'مدارس النخبة العالمية', 
+      isActive: true, 
+      principalId: '', 
+      subscriptionEndDate: '2026-06-30',
+      studentCount: 0
     }
   ];
 
@@ -266,10 +274,37 @@ export const exportToCSV = (students: Student[], records: AttendanceRecord[]) =>
   document.body.removeChild(link);
 };
 
-// --- User Auth ---
+// --- User Auth & Management ---
 export const getUsers = (): User[] => {
   const data = localStorage.getItem(STORAGE_KEYS.USERS);
   return data ? JSON.parse(data) : [];
+};
+
+export const saveUser = (user: User) => {
+  const users = getUsers();
+  const index = users.findIndex(u => u.id === user.id);
+  if (index >= 0) {
+    users[index] = user;
+  } else {
+    users.push(user);
+  }
+  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+};
+
+export const deleteUser = (userId: string) => {
+   const users = getUsers();
+   const filtered = users.filter(u => u.id !== userId);
+   localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filtered));
+};
+
+export const impersonateUser = (userId: string): boolean => {
+  const users = getUsers();
+  const user = users.find(u => u.id === userId);
+  if (user) {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    return true;
+  }
+  return false;
 };
 
 export const loginUser = (username: string): { user: User | null, error?: string } => {
@@ -305,4 +340,47 @@ export const logoutUser = () => {
 export const getCurrentUser = (): User | null => {
   const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
   return data ? JSON.parse(data) : null;
+};
+
+// --- Mock System Logs ---
+export const getSystemActivityLogs = (): SystemLog[] => {
+  // In a real app, these would come from the server
+  // Here we generate dynamic mock logs based on real data
+  const users = getUsers();
+  const schools = getSchools();
+  
+  const logs: SystemLog[] = [];
+  const actions = ['تسجيل دخول', 'تحديث بيانات مدرسة', 'إضافة مستخدم جديد', 'تجديد اشتراك', 'حذف طالب'];
+  
+  for (let i = 0; i < 15; i++) {
+    const randomUser = users[Math.floor(Math.random() * users.length)];
+    const randomAction = actions[Math.floor(Math.random() * actions.length)];
+    const randomSchool = schools[Math.floor(Math.random() * schools.length)];
+    
+    let details = '';
+    let type: 'info' | 'warning' | 'danger' = 'info';
+
+    if (randomAction.includes('حذف')) {
+      type = 'danger';
+      details = `قام ${randomUser.name} بحذف سجلات`;
+    } else if (randomAction.includes('اشتراك')) {
+      type = 'warning';
+      details = `تم تحديث اشتراك ${randomSchool.name}`;
+    } else {
+      details = `عملية ناجحة بواسطة ${randomUser.name}`;
+    }
+
+    const date = new Date();
+    date.setHours(date.getHours() - i * 2);
+
+    logs.push({
+      id: `log-${i}`,
+      action: randomAction,
+      user: randomUser.name,
+      details: details,
+      date: date.toISOString(),
+      type
+    });
+  }
+  return logs;
 };

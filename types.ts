@@ -56,3 +56,12 @@ export interface User {
   relatedStudentId?: string;
   managedSchoolIds?: string[]; // For principals who manage multiple schools
 }
+
+export interface SystemLog {
+  id: string;
+  action: string;
+  user: string;
+  details: string;
+  date: string;
+  type: 'info' | 'warning' | 'danger';
+}
