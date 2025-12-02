@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Save, Download, Upload, Trash2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Save, Download, Upload, Trash2, AlertTriangle, ShieldCheck, BrainCircuit, Check, X } from 'lucide-react';
 import { AppSettings } from '../types';
 import { saveSettings, createBackup, restoreBackup, clearAllData } from '../services/storageService';
 
@@ -11,7 +11,27 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [saveMessage, setSaveMessage] = useState('');
+  const [isAiReady, setIsAiReady] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Check if API key is present in environment
+    const checkAiStatus = () => {
+      let hasKey = false;
+      try {
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+          hasKey = true;
+        }
+      } catch(e) {}
+      
+      if (!hasKey && typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+        hasKey = true;
+      }
+      setIsAiReady(hasKey);
+    };
+    checkAiStatus();
+  }, []);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +149,31 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
             )}
           </div>
         </form>
+      </div>
+
+      {/* AI Status Check */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <BrainCircuit className="text-purple-600" />
+          حالة الذكاء الاصطناعي (Gemini AI)
+        </h3>
+        <div className={`flex items-center gap-3 p-4 rounded-lg border ${isAiReady ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          {isAiReady ? (
+            <Check className="text-green-600" size={24} />
+          ) : (
+            <X className="text-amber-600" size={24} />
+          )}
+          <div>
+            <p className="font-bold">
+              {isAiReady ? 'الخدمة جاهزة ومتصلة' : 'لم يتم العثور على مفتاح API'}
+            </p>
+            <p className="text-sm opacity-80 mt-1">
+              {isAiReady 
+                ? 'يمكنك استخدام ميزات التحليل الذكي في لوحة التحكم وتقارير الطلاب.' 
+                : 'تأكد من إضافة VITE_API_KEY في إعدادات البيئة (Environment Variables) في Vercel لتفعيل ميزات الذكاء الاصطناعي.'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Data Management */}

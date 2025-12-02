@@ -2,7 +2,29 @@ import { GoogleGenAI } from "@google/genai";
 import { Student, AttendanceRecord, AttendanceStatus } from '../types';
 
 const getAiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  let apiKey = '';
+  
+  // 1. Try Vite environment variable (Standard for Vercel/Vite deployments)
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+      // @ts-ignore
+      apiKey = import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {
+    // Continue if import.meta is not supported
+  }
+
+  // 2. Fallback to process.env (For Node.js or local preview environment)
+  if (!apiKey && typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    apiKey = process.env.API_KEY;
+  }
+
+  if (!apiKey) {
+    console.warn("Gemini API Key is missing. AI features will not work. Please set VITE_API_KEY in your environment variables.");
+  }
+
+  return new GoogleGenAI({ apiKey });
 };
 
 export const analyzeAttendance = async (students: Student[], records: AttendanceRecord[]) => {
@@ -46,7 +68,7 @@ export const analyzeAttendance = async (students: Student[], records: Attendance
     return response.text;
   } catch (error) {
     console.error("Error calling Gemini API:", error);
-    return "عذراً، حدث خطأ أثناء تحليل البيانات. تأكد من إعداد مفتاح API بشكل صحيح.";
+    return "عذراً، حدث خطأ أثناء تحليل البيانات. تأكد من إعداد مفتاح API بشكل صحيح (VITE_API_KEY).";
   }
 };
 
@@ -93,7 +115,7 @@ export const analyzeStudentReport = async (student: Student, records: Attendance
     return response.text;
   } catch (error) {
     console.error("Error generating student report:", error);
-    return "لا يمكن توليد التقرير حالياً.";
+    return "لا يمكن توليد التقرير حالياً. تأكد من إعداد مفتاح API.";
   }
 };
 
